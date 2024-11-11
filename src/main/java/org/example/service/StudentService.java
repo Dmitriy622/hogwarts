@@ -1,54 +1,92 @@
 package org.example.service;
 
+import org.springframework.stereotype.Service;
+import org.example.model.Faculty;
+import org.example.exception.FacultyNotFoundException;
 import org.example.exception.StudentNotFoundException;
 import org.example.model.Student;
-import org.springframework.stereotype.Service;
+import org.example.repositories.FacultyRepository;
+import org.example.repositories.StudentRepository;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+
 
 @Service
 public class StudentService {
 
-    private final Map<Long, Student> map = new HashMap<>();
+    private final StudentRepository studentRepository;
+    private final FacultyRepository facultyRepository;
 
-    private long idGenerator = 1;
+    public StudentService(StudentRepository studentRepository, FacultyRepository facultyRepository) {
+
+        this.studentRepository = studentRepository;
+        this.facultyRepository = facultyRepository;
+    }
+
 
     public Student create(Student student) {
-        student.setId(idGenerator++);
-        map.put(student.getId(), student);
-        return student;
+        if (student.getFaculty() != null && student.getFaculty().getId() != null) {
+            Faculty faculty = facultyRepository.findById(student.getFaculty().getId())
+                    .orElseThrow(() -> new FacultyNotFoundException(student.getFaculty().getId()));
+            student.setFaculty(faculty);
+        }
+        return studentRepository.save(student);
     }
 
     public Student update(long id, Student student) {
-        if (!map.containsKey(id)) {
-            throw new StudentNotFoundException(id);
-        }
-        Student old = map.get(id);
-        old.setName(student.getName());
-        old.setAge(student.getAge());
-        return old;
+        return studentRepository.findById(id)
+                .map(oldStudent -> {
+                    oldStudent.setName(student.getName());
+                    oldStudent.setAge(student.getAge());
+                    if (student.getFaculty() != null && student.getFaculty().getId() != null) {
+                        Faculty faculty = facultyRepository.findById(student.getFaculty().getId())
+                                .orElseThrow(() -> new FacultyNotFoundException(student.getFaculty().getId()));
+                        oldStudent.setFaculty(faculty);
+                    }
+                    return studentRepository.save(oldStudent);
+                })
+                .orElseThrow(() -> new StudentNotFoundException(id));
     }
 
     public Student delete(long id) {
-        if (!map.containsKey(id)) {
-            throw new StudentNotFoundException(id);
-        }
-        return map.remove(id);
+        return studentRepository.findById(id)
+                .map(student->{
+                    studentRepository.delete(student);
+                    return student;
+                })
+                .orElseThrow(()->new StudentNotFoundException(id));
     }
 
     public Student get(long id) {
-        if (!map.containsKey(id)) {
-            throw new StudentNotFoundException(id);
-        }
-        return map.get(id);
+        return studentRepository.findById(id)
+                .orElseThrow(()->new StudentNotFoundException(id));
     }
 
     public List<Student> find(int age) {
-        return map.values().stream()
-                .filter(student -> student.getAge() == age)
-                .collect(Collectors.toList());
+        return studentRepository.findByAge(age);
+    }
+
+    public List<Student> findByAgeBetween(int minAge,int maxAge) {
+        return studentRepository.findByAgeBetween(minAge, maxAge);
+    }
+
+    public List<Student> getAllStudents() {
+        return studentRepository.findAll();
+    }
+
+    public List<Student> findByAgeGreaterThan(int minAge) {
+        return studentRepository.findByAgeGreaterThan(minAge);
+    }
+
+    public List<Student> findByAgeLessThan(int maxAge) {
+        return studentRepository.findByAgeLessThan(maxAge);
+    }
+
+
+    public Faculty findFaculty(Long studentId) {
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new StudentNotFoundException(studentId));
+
+        return student.getFaculty();
     }
 }

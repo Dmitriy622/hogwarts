@@ -1,50 +1,67 @@
 package org.example.service;
 
-import org.example.exception.FacultyNotFoundException;
+
+import org.springframework.stereotype.Service;
 import org.example.model.Faculty;
+import org.example.model.Student;
+import org.example.exception.FacultyNotFoundException;
+import org.example.repositories.FacultyRepository;
+import org.example.repositories.StudentRepository;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
+@Service
 public class FacultyService {
-    private final Map<Long, Faculty> map = new HashMap<>();
 
-    private long idGenerator = 1;
+    private final FacultyRepository facultyRepository;
+    private final StudentRepository studentRepository;
+
+    public FacultyService(FacultyRepository facultyRepository, StudentRepository studentRepository) {
+        this.facultyRepository = facultyRepository;
+        this.studentRepository = studentRepository;
+    }
 
     public Faculty create(Faculty faculty) {
-        faculty.setId(idGenerator++);
-        map.put(faculty.getId(), faculty);
-        return faculty;
+        return facultyRepository.save(faculty);
     }
 
     public Faculty update(long id, Faculty faculty) {
-        if (!map.containsKey(id)) {
-            throw new FacultyNotFoundException(id);
-        }
-        Faculty old = map.get(id);
-        old.setName(faculty.getName());
-        old.setColor(faculty.getColor());
-        return old;
+        return facultyRepository.findById(id)
+                .map(oldFaculty -> {
+                    oldFaculty.setName(faculty.getName());
+                    oldFaculty.setColor(faculty.getColor());
+                    return facultyRepository.save(oldFaculty);
+                })
+                .orElseThrow(() -> new FacultyNotFoundException(id));
     }
 
     public Faculty delete(long id) {
-        if (!map.containsKey(id)) {
-            throw new FacultyNotFoundException(id);
-        }
-        return map.remove(id);
+        return facultyRepository.findById(id)
+                .map(faculty -> {
+                    facultyRepository.delete(faculty);
+                    return faculty;
+                })
+                .orElseThrow(() -> new FacultyNotFoundException(id));
     }
 
     public Faculty get(long id) {
-        if (!map.containsKey(id)) {
-            throw new FacultyNotFoundException(id);
-        }
-        return map.get(id);
+        return facultyRepository.findById(id)
+                .orElseThrow(() -> new FacultyNotFoundException(id));
     }
-    public List<Faculty> find(String color) {
-        return map.values().stream()
-                .filter(student -> student.getColor() == color)
-                .collect(Collectors.toList());
+
+    public List<Faculty> findByColor(String color) {
+        return facultyRepository.findByColorIgnoreCase(color);
+    }
+    public List<Faculty> findByName(String name) {
+        return facultyRepository.findByNameIgnoreCase(name);
+    }
+
+    public List<Faculty> findByNameOrColor(String nameOrColor) {
+        return facultyRepository.findByNameIgnoreCaseOrColorIgnoreCase(nameOrColor,nameOrColor);
+    }
+
+    public List<Student> findStudents(Long faculty_id) {
+        Faculty faculty = get(faculty_id);
+        return studentRepository.findByFaculty_Id(faculty_id);
     }
 }
